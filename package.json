@@ -151,6 +151,16 @@
                     "type": "string",
                     "default": "",
                     "description": "Path to an optional JSON config file."
+                },
+                "shexli.discoveryMode": {
+                    "type": "string",
+                    "enum": [
+                        "auto",
+                        "config",
+                        "metadata"
+                    ],
+                    "default": "auto",
+                    "description": "Controls when Shexli activates. 'auto' (default) looks for config or metadata.json. 'config' only looks for .shexlirc/.shexli.json. 'metadata' only looks for metadata.json."
                 }
             }
         }

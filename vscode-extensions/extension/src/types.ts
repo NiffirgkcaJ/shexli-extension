@@ -10,6 +10,7 @@ export interface ShexliConfigFile {
     ruleDisable?: string[];
     runMode?: "auto" | "onChange" | "onSave" | "manual";
     debounceMs?: number;
+    discoveryMode?: "auto" | "config" | "metadata";
 }
 
 export interface ShexliConfig {
@@ -25,6 +26,7 @@ export interface ShexliConfig {
     runMode: "auto" | "onChange" | "onSave" | "manual";
     debounceMs: number;
     configPath: string | null;
+    discoveryMode: "auto" | "config" | "metadata";
 }
 
 export interface ShexliEvidence {

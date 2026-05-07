@@ -31,6 +31,10 @@ export async function loadConfig(
         ),
         debounceMs: settings.get<number>("debounceMs", 800),
         configPath,
+        discoveryMode: settings.get<"auto" | "config" | "metadata">(
+            "discoveryMode",
+            "auto",
+        ),
     };
 
     const workspaceConfigPath = resolveWorkspaceConfigPath();
@@ -95,11 +99,25 @@ export function applyConfigFile(
     if (typeof fileConfig.debounceMs === "number") {
         config.debounceMs = fileConfig.debounceMs;
     }
+    if (fileConfig.discoveryMode) {
+        config.discoveryMode = fileConfig.discoveryMode;
+    }
 }
 
 export function resolveWorkspaceConfigPath(): string | null {
     const root = resolveWorkspaceRoot();
-    return root ? path.join(root, ".shexli.json") : null;
+    if (!root) {
+        return null;
+    }
+
+    const candidates = [".shexlirc", ".shexli.json"];
+    for (const name of candidates) {
+        const full = path.join(root, name);
+        if (fs.existsSync(full)) {
+            return full;
+        }
+    }
+    return path.join(root, ".shexli.json");
 }
 
 export function resolveWorkspaceRoot(): string | null {

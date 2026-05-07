@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
-import { loadConfig } from "./config";
+import * as fs from "fs";
+import { loadConfig, resolveWorkspaceRoot } from "./config";
 import { ShexliConfig } from "./types";
 import {
     analyzeWorkspacePackages,
@@ -25,7 +26,30 @@ export function activate(context: vscode.ExtensionContext): void {
     );
     statusBar.command = "shexli.analyzePackage";
     statusBar.text = "Shexli";
-    statusBar.show();
+
+    async function shouldEnable(config: ShexliConfig): Promise<boolean> {
+        const root = resolveWorkspaceRoot();
+        if (!root) {
+            return false;
+        }
+
+        const hasConfig =
+            fs.existsSync(path.join(root, ".shexlirc")) ||
+            fs.existsSync(path.join(root, ".shexli.json"));
+
+        if (config.discoveryMode === "config") {
+            return hasConfig;
+        }
+
+        const hasMetadata = (await discoverPackages(config, output)).length > 0;
+
+        if (config.discoveryMode === "metadata") {
+            return hasMetadata;
+        }
+
+        // auto mode
+        return hasConfig || hasMetadata;
+    }
 
     const analyzeWorkspaceCommand = vscode.commands.registerCommand(
         "shexli.analyzeWorkspace",
@@ -172,6 +196,9 @@ export function activate(context: vscode.ExtensionContext): void {
     const onSaveListener = vscode.workspace.onDidSaveTextDocument(
         async (doc) => {
             const config = await loadConfig(output, context.extensionPath);
+            if (!(await shouldEnable(config))) {
+                return;
+            }
             if (config.runMode !== "onSave" && config.runMode !== "auto") {
                 return;
             }
@@ -190,6 +217,9 @@ export function activate(context: vscode.ExtensionContext): void {
     const onChangeListener = vscode.workspace.onDidChangeTextDocument(
         async (event) => {
             const config = await loadConfig(output, context.extensionPath);
+            if (!(await shouldEnable(config))) {
+                return;
+            }
             if (config.runMode !== "onChange" && config.runMode !== "auto") {
                 return;
             }
@@ -207,12 +237,18 @@ export function activate(context: vscode.ExtensionContext): void {
 
     const onEditorChangeListener = vscode.window.onDidChangeActiveTextEditor(
         (editor) => {
-            refreshStatusBar(
-                statusBar,
-                output,
-                context.extensionPath,
-                editor?.document,
-            ).catch((err) => {
+            loadConfig(output, context.extensionPath).then(async (config) => {
+                if (await shouldEnable(config)) {
+                    await refreshStatusBar(
+                        statusBar,
+                        output,
+                        context.extensionPath,
+                        editor?.document,
+                    );
+                } else {
+                    statusBar.hide();
+                }
+            }).catch((err) => {
                 output.appendLine(
                     `Shexli: Status update failed: ${String(err)}`,
                 );
@@ -225,7 +261,13 @@ export function activate(context: vscode.ExtensionContext): void {
             if (!event.affectsConfiguration("shexli")) {
                 return;
             }
-            refreshStatusBar(statusBar, output, context.extensionPath).catch(
+            loadConfig(output, context.extensionPath).then(async (config) => {
+                if (await shouldEnable(config)) {
+                    await refreshStatusBar(statusBar, output, context.extensionPath);
+                } else {
+                    statusBar.hide();
+                }
+            }).catch(
                 (err) => {
                     output.appendLine(
                         `Shexli: Status update failed: ${String(err)}`,
@@ -242,22 +284,25 @@ export function activate(context: vscode.ExtensionContext): void {
         onConfigChangeListener,
     );
 
-    refreshStatusBar(statusBar, output, context.extensionPath).catch((err) => {
-        output.appendLine(`Shexli: Status update failed: ${String(err)}`);
-    });
-
-    // Trigger initial workspace analysis on startup
+    // Initial discovery and analysis
     loadConfig(output, context.extensionPath).then(async (config) => {
-        if (config.runMode === "auto" || config.runMode === "onChange") {
-            output.appendLine("Shexli: Triggering initial workspace analysis...");
-            await analyzeWorkspacePackages(
-                config,
-                diagnostics,
-                packageFiles,
-                packageStamps,
-                output,
-                { force: false, clearMissing: true },
-            );
+        if (await shouldEnable(config)) {
+            await refreshStatusBar(statusBar, output, context.extensionPath);
+            
+            if (config.runMode === "auto" || config.runMode === "onChange") {
+                output.appendLine("Shexli: Discovery successful, triggering initial workspace analysis...");
+                await analyzeWorkspacePackages(
+                    config,
+                    diagnostics,
+                    packageFiles,
+                    packageStamps,
+                    output,
+                    { force: false, clearMissing: true },
+                );
+            }
+        } else {
+            statusBar.hide();
+            output.appendLine("Shexli: No GNOME extension package or config found. Extension idle.");
         }
     }).catch((err) => {
         output.appendLine(`Shexli: Startup analysis failed: ${String(err)}`);
