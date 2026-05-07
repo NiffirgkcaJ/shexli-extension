@@ -1,0 +1,32 @@
+# IDE and Git
+.agent/
+.git/
+.vscode/
+
+# Dependencies
+node_modules/
+package-lock.json
+
+# Source Code
+vscode-extensions/extension/src/
+vscode-extensions/source/
+
+# Build Artifacts
+vscode-extensions/.venv-build/
+vscode-extensions/build/
+vscode-extensions/extension/dist/**/*.map
+vscode-extensions/extension/resources/bin/README.md
+
+# Tests
+vscode-extensions/extension/test/
+
+# Config & CI/CD
+.gitignore
+.github/
+.gitlab-ci.yml
+.prettierignore
+.prettierrc
+.shexli-version
+.vscodeignore
+eslint.config.mjs
+tsconfig.json

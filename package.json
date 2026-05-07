@@ -1,0 +1,180 @@
+{
+    "name": "shexli-gnome-extension",
+    "displayName": "Shexli GNOME Extension",
+    "description": "Run Shexli static analysis for GNOME Shell extensions.",
+    "license": "AGPL-3.0-or-later",
+    "version": "0.0.1",
+    "icon": "vscode-extensions/extension/resources/icon/icon.png",
+    "publisher": "niffirgkcaj",
+    "keywords": [
+        "gnome",
+        "gnome-shell",
+        "extension",
+        "linter",
+        "static-analysis",
+        "shexli"
+    ],
+    "homepage": "https://github.com/NiffirgkcaJ/shexli-extension#readme",
+    "bugs": {
+        "url": "https://github.com/NiffirgkcaJ/shexli-extension/issues"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/NiffirgkcaJ/shexli-extension.git"
+    },
+    "engines": {
+        "vscode": "^1.90.0"
+    },
+    "os": [
+        "linux"
+    ],
+    "categories": [
+        "Linters"
+    ],
+    "main": "./vscode-extensions/extension/dist/extension.js",
+    "activationEvents": [
+        "onStartupFinished"
+    ],
+    "contributes": {
+        "commands": [
+            {
+                "command": "shexli.analyzeWorkspace",
+                "title": "Shexli: Analyze Workspace"
+            },
+            {
+                "command": "shexli.analyzePackage",
+                "title": "Shexli: Analyze Package for Current File"
+            },
+            {
+                "command": "shexli.pickPackageRoot",
+                "title": "Shexli: Pick Package to Analyze"
+            },
+            {
+                "command": "shexli.rescanWorkspace",
+                "title": "Shexli: Rescan Workspace"
+            },
+            {
+                "command": "shexli.setPackageRootForCurrentFile",
+                "title": "Shexli: Set Package Root for Current File"
+            }
+        ],
+        "configuration": {
+            "title": "Shexli",
+            "properties": {
+                "shexli.binaryPath": {
+                    "type": "string",
+                    "default": "shexli",
+                    "description": "Path to the Shexli executable."
+                },
+                "shexli.useBundledBinary": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Prefer the bundled Shexli binary when available."
+                },
+                "shexli.executionMode": {
+                    "type": "string",
+                    "enum": [
+                        "binary",
+                        "python",
+                        "auto"
+                    ],
+                    "default": "binary",
+                    "description": "How to run Shexli: bundled/system binary, Python module, or automatic fallback."
+                },
+                "shexli.pythonPath": {
+                    "type": "string",
+                    "default": "python3",
+                    "description": "Python executable to use when executionMode is python or auto."
+                },
+                "shexli.ruleEnable": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [],
+                    "description": "Rule IDs or wildcard patterns to include, e.g. EGO-M-* ."
+                },
+                "shexli.ruleDisable": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [],
+                    "description": "Rule IDs or wildcard patterns to exclude."
+                },
+                "shexli.roots": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [],
+                    "description": "Workstation roots that contain GNOME extension packages."
+                },
+                "shexli.packages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [],
+                    "description": "Explicit GNOME extension package roots to analyze."
+                },
+                "shexli.exclude": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [
+                        "**/.git/**",
+                        "**/node_modules/**",
+                        "**/dist/**",
+                        "**/build/**"
+                    ],
+                    "description": "Glob patterns to exclude from package discovery."
+                },
+                "shexli.runMode": {
+                    "type": "string",
+                    "enum": [
+                        "onChange",
+                        "onSave",
+                        "manual"
+                    ],
+                    "default": "onChange",
+                    "description": "When to run analysis."
+                },
+                "shexli.debounceMs": {
+                    "type": "number",
+                    "default": 800,
+                    "description": "Debounce delay for onChange runs."
+                },
+                "shexli.configPath": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Path to an optional JSON config file."
+                }
+            }
+        }
+    },
+    "scripts": {
+        "compile": "tsc -p .",
+        "watch": "tsc -watch -p .",
+        "build-binary": "bash vscode-extensions/build/build-binary.sh",
+        "verify-binary": "node vscode-extensions/build/verify-binary.js",
+        "vscode:prepublish": "npm run verify-binary && npm run compile",
+        "package": "vsce package",
+        "lint": "eslint .",
+        "format": "prettier --write .",
+        "test": "npm run compile && node --test vscode-extensions/extension/test/**/*.test.mjs"
+    },
+    "devDependencies": {
+        "@eslint/js": "^10.0.1",
+        "@types/node": "^20.11.30",
+        "@types/vscode": "^1.90.0",
+        "@vscode/vsce": "^3.9.1",
+        "eslint": "^10.3.0",
+        "eslint-config-prettier": "^10.1.8",
+        "ovsx": "^0.10.11",
+        "prettier": "^3.8.3",
+        "typescript": "^5.5.0",
+        "typescript-eslint": "^8.59.1"
+    }
+}

@@ -1,0 +1,6 @@
+{
+    "uuid": "bad-subprocess@example.com",
+    "name": "Bad Subprocess",
+    "description": "Uses sudo in a subprocess call.",
+    "shell-version": ["45"]
+}

@@ -1,0 +1,156 @@
+name: Release Workflow
+
+on:
+    push:
+        branches:
+            - main
+        tags-ignore:
+            - "*"
+
+jobs:
+    # --- JOB 1: VERIFY VERSION MATCH ---
+    verify-version-match:
+        if: startsWith(github.event.head_commit.message, 'Version ')
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Install Dependencies
+              run: sudo apt-get update && sudo apt-get install -y jq
+
+            - name: Verify that commit version matches package.json
+              run: |
+                  COMMIT_MSG="${{ github.event.head_commit.message }}"
+                  COMMIT_VERSION=$(echo "$COMMIT_MSG" | sed -n 's/^Version \([^[:space:]]*\).*/\1/p')
+
+                  PACKAGE_VERSION=$(jq -r '.version' package.json)
+
+                  echo "Version in commit message: $COMMIT_VERSION"
+                  echo "Version in package.json: $PACKAGE_VERSION"
+
+                  if [[ "$COMMIT_VERSION" != "$PACKAGE_VERSION" ]]; then
+                    echo "::error::Version mismatch! Commit version is '$COMMIT_VERSION' but package.json version is '$PACKAGE_VERSION'."
+                    exit 1
+                  else
+                    echo "Versions match. Proceeding with release."
+                  fi
+
+    # --- JOB 2: BUILD AND PUBLISH ---
+    build-and-publish:
+        needs: verify-version-match
+        if: startsWith(github.event.head_commit.message, 'Version ')
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+
+            - name: Setup Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12"
+
+            - name: Show toolchain versions
+              run: |
+                  node --version
+                  npm --version
+                  python3 --version
+                  python3 -m pip --version
+
+            - name: Install build dependencies
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y \
+                      build-essential \
+                      jq \
+                      libbz2-dev \
+                      libffi-dev \
+                      liblzma-dev \
+                      libsqlite3-dev \
+                      libssl-dev \
+                      pkg-config \
+                      zlib1g-dev
+
+            - name: Install NPM Dependencies
+              run: npm ci
+
+            - name: Build Python Binary
+              run: npm run build-binary
+
+            - name: Package VSIX
+              run: npm run package
+
+            - name: Extract Version and Asset Information
+              run: |
+                  PACKAGE_NAME=$(jq -r '.name' package.json)
+                  PACKAGE_VERSION=$(jq -r '.version' package.json)
+                  echo "RELEASE_VERSION=$PACKAGE_VERSION" >> $GITHUB_ENV
+                  echo "VSIX_FILE=${PACKAGE_NAME}-${PACKAGE_VERSION}.vsix" >> $GITHUB_ENV
+
+            - name: Create GitHub Release
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: v${{ env.RELEASE_VERSION }}
+                  name: ${{ github.event.head_commit.message }}
+                  files: ${{ env.VSIX_FILE }}
+                  generate_release_notes: true
+
+            - name: Publish to Visual Studio Marketplace
+              uses: HaaLeo/publish-vscode-extension@v1
+              with:
+                  pat: ${{ secrets.VS_MARKETPLACE_TOKEN }}
+                  registryUrl: https://marketplace.visualstudio.com
+                  extensionFile: ${{ env.VSIX_FILE }}
+
+            - name: Publish to OpenVSX
+              uses: HaaLeo/publish-vscode-extension@v1
+              with:
+                  pat: ${{ secrets.OPEN_VSX_TOKEN }}
+                  registryUrl: https://open-vsx.org
+                  extensionFile: ${{ env.VSIX_FILE }}
+
+    # --- JOB 3: SYNC TO GITLAB ---
+    sync-to-gitlab:
+        needs: build-and-publish
+        if: always()
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Setup SSH Agent
+              uses: webfactory/ssh-agent@v0.9.0
+              with:
+                  ssh-private-key: ${{ secrets.KEY_GITHUB_GITLAB_SYNC }}
+
+            - name: Push to GitLab
+              run: |
+                  echo "Syncing to GitLab..."
+
+                  # Configure git
+                  git config --global user.name "GitHub Action Bot"
+                  git config --global user.email "actions@github.com"
+
+                  # Add GitLab remote
+                  ssh-keyscan gitlab.com >> ~/.ssh/known_hosts
+                  git remote add gitlab "git@gitlab.com:NiffirgkcaJ/${{ github.event.repository.name }}.git"
+
+                  # Push to GitLab
+                  echo "Pushing to GitLab..."
+                  git push gitlab main --force
+
+                  # Push tags to GitLab
+                  echo "Pushing tags to GitLab..."
+                  git push gitlab --tags --force

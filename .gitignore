@@ -1,0 +1,12 @@
+# Ignore IDE/editor-specific files
+.vscode/
+
+# Ignore Node modules directories
+node_modules/
+
+# Ignore built and temporary files
+/*.vsix
+vscode-extensions/.venv-build/
+vscode-extensions/build/pyinstaller/
+vscode-extensions/extension/dist/
+vscode-extensions/extension/resources/bin/shexli

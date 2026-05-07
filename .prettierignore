@@ -1,0 +1,23 @@
+# Ignore IDE/editor-specific files
+.git/
+.agent/
+.vscode/
+
+# Ignore Node modules directories
+node_modules/
+
+# Ignore built and temporary files
+vscode-extensions/.venv-build/
+vscode-extensions/build/
+vscode-extensions/extension/dist/
+
+# Ignore external source code
+vscode-extensions/source/
+
+# Ignore config files
+.prettierignore
+.prettierrc
+.shexli-version
+.vscodeignore
+eslint.config.mjs
+tsconfig.json

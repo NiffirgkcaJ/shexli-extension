@@ -1,0 +1,77 @@
+name: Sync Upstream Shexli
+
+on:
+    schedule:
+        - cron: "0 0 * * 0" # Every Sunday at midnight
+    workflow_dispatch: # Allow manual trigger
+
+jobs:
+    sync:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+            pull-requests: write
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Install jq
+              run: sudo apt-get update && sudo apt-get install -y jq
+
+            - name: Check GNOME API for updates
+              id: check
+              run: |
+                  LATEST_HASH=$(curl -fsS "https://gitlab.gnome.org/api/v4/projects/Infrastructure%2Fextensions-web/repository/commits?path=shexli&per_page=1" | jq -r '.[0].id // empty')
+                  if [ -f .shexli-version ]; then
+                    CURRENT_HASH=$(cat .shexli-version)
+                  else
+                    CURRENT_HASH=""
+                  fi
+
+                  echo "Latest Upstream Hash: $LATEST_HASH"
+                  echo "Current Local Hash: $CURRENT_HASH"
+
+                  if [ -z "$LATEST_HASH" ]; then
+                    echo "Failed to resolve latest upstream hash. Skipping update."
+                    echo "update_needed=false" >> $GITHUB_OUTPUT
+                    exit 0
+                  fi
+
+                  if [ "$LATEST_HASH" == "$CURRENT_HASH" ]; then
+                    echo "No updates found. Exiting."
+                    echo "update_needed=false" >> $GITHUB_OUTPUT
+                  else
+                    echo "Updates found!"
+                    echo "update_needed=true" >> $GITHUB_OUTPUT
+                    echo "latest_hash=$LATEST_HASH" >> $GITHUB_OUTPUT
+                  fi
+
+            - name: Download New Source Code
+              if: steps.check.outputs.update_needed == 'true'
+              run: |
+                  # Shallow clone the repo into a temporary folder
+                  git clone --depth 1 https://gitlab.gnome.org/Infrastructure/extensions-web.git temp-repo
+
+                  # Replace the local shexli folder with the new one
+                  rm -rf vscode-extensions/source/shexli
+                  cp -r temp-repo/shexli vscode-extensions/source/shexli
+
+                  # Clean up
+                  rm -rf temp-repo
+
+                  # Update the version file
+                  echo "${{ steps.check.outputs.latest_hash }}" > .shexli-version
+
+            - name: Create Pull Request
+              if: steps.check.outputs.update_needed == 'true'
+              uses: peter-evans/create-pull-request@v6
+              with:
+                  commit-message: "Sync upstream shexli engine to ${{ steps.check.outputs.latest_hash }}"
+                  title: "Update Upstream Shexli Engine"
+                  body: |
+                      This PR automatically syncs the local `shexli` engine with the latest changes from the upstream GNOME `extensions-web` repository.
+
+                      **Latest Commit:** `https://gitlab.gnome.org/Infrastructure/extensions-web/-/commit/${{ steps.check.outputs.latest_hash }}`
+                  branch: "sync-shexli-update"
+                  delete-branch: true

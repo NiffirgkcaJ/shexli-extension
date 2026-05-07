@@ -1,0 +1,2 @@
+[console_scripts]
+shexli = shexli.cli:main
