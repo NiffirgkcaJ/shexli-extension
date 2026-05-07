@@ -172,7 +172,7 @@ export function activate(context: vscode.ExtensionContext): void {
     const onSaveListener = vscode.workspace.onDidSaveTextDocument(
         async (doc) => {
             const config = await loadConfig(output, context.extensionPath);
-            if (config.runMode !== "onSave") {
+            if (config.runMode !== "onSave" && config.runMode !== "auto") {
                 return;
             }
             scheduleAnalysis(
@@ -190,7 +190,7 @@ export function activate(context: vscode.ExtensionContext): void {
     const onChangeListener = vscode.workspace.onDidChangeTextDocument(
         async (event) => {
             const config = await loadConfig(output, context.extensionPath);
-            if (config.runMode !== "onChange") {
+            if (config.runMode !== "onChange" && config.runMode !== "auto") {
                 return;
             }
             scheduleAnalysis(
@@ -244,6 +244,23 @@ export function activate(context: vscode.ExtensionContext): void {
 
     refreshStatusBar(statusBar, output, context.extensionPath).catch((err) => {
         output.appendLine(`Shexli: Status update failed: ${String(err)}`);
+    });
+
+    // Trigger initial workspace analysis on startup
+    loadConfig(output, context.extensionPath).then(async (config) => {
+        if (config.runMode === "auto" || config.runMode === "onChange") {
+            output.appendLine("Shexli: Triggering initial workspace analysis...");
+            await analyzeWorkspacePackages(
+                config,
+                diagnostics,
+                packageFiles,
+                packageStamps,
+                output,
+                { force: false, clearMissing: true },
+            );
+        }
+    }).catch((err) => {
+        output.appendLine(`Shexli: Startup analysis failed: ${String(err)}`);
     });
 }
 

@@ -134,12 +134,13 @@
                 "shexli.runMode": {
                     "type": "string",
                     "enum": [
+                        "auto",
                         "onChange",
                         "onSave",
                         "manual"
                     ],
-                    "default": "onChange",
-                    "description": "When to run analysis."
+                    "default": "auto",
+                    "description": "When to run the analysis."
                 },
                 "shexli.debounceMs": {
                     "type": "number",

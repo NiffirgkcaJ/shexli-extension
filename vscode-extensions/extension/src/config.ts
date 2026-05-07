@@ -25,9 +25,9 @@ export async function loadConfig(
         pythonPath: settings.get<string>("pythonPath", "python3"),
         ruleEnable: settings.get<string[]>("ruleEnable", []),
         ruleDisable: settings.get<string[]>("ruleDisable", []),
-        runMode: settings.get<"onChange" | "onSave" | "manual">(
+        runMode: settings.get<"auto" | "onChange" | "onSave" | "manual">(
             "runMode",
-            "onChange",
+            "auto",
         ),
         debounceMs: settings.get<number>("debounceMs", 800),
         configPath,
