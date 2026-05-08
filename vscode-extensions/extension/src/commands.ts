@@ -191,7 +191,7 @@ export async function analyzePackage(
 
     reportSummary(packageRoot, result, output);
 
-    const { nextFiles, diagnosticsByUri } = buildDiagnostics(
+    const { nextFiles, diagnosticsByUri } = await buildDiagnostics(
         result,
         packageRoot,
     );

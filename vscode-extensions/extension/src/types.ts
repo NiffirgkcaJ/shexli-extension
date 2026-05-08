@@ -32,6 +32,7 @@ export interface ShexliConfig {
 export interface ShexliEvidence {
     path: string;
     line?: number | null;
+    column?: number | null;
     snippet?: string | null;
 }
 

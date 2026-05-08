@@ -25,14 +25,14 @@ export function parseResult(
     }
 }
 
-export function buildDiagnostics(
+export async function buildDiagnostics(
     result: ShexliResult,
     packageRoot: string,
-): {
+): Promise<{
     nextFiles: Set<string>;
     diagnosticsByUri: Map<vscode.Uri, vscode.Diagnostic[]>;
-} {
-    const diagnosticsByUri = new Map<vscode.Uri, vscode.Diagnostic[]>();
+}> {
+    const grouped = new Map<string, { uri: vscode.Uri; entries: vscode.Diagnostic[] }>();
     const nextFiles = new Set<string>();
     const fallbackMetadata = path.join(packageRoot, METADATA_FILE);
 
@@ -45,7 +45,7 @@ export function buildDiagnostics(
                 nextFiles.add(fallbackMetadata);
                 const code = buildDiagnosticCode(finding);
                 appendDiagnostic(
-                    diagnosticsByUri,
+                    grouped,
                     uri,
                     new vscode.Range(0, 0, 0, 1),
                     formatMessage(finding),
@@ -62,12 +62,12 @@ export function buildDiagnostics(
                 continue;
             }
             const line = Math.max(0, (item.line ?? 1) - 1);
-            const range = buildEvidenceRange(item, line);
             const uri = vscode.Uri.file(resolved);
+            const range = await buildEvidenceRange(item, line, uri);
             nextFiles.add(resolved);
             const code = buildDiagnosticCode(finding);
             appendDiagnostic(
-                diagnosticsByUri,
+                grouped,
                 uri,
                 range,
                 formatMessage(finding),
@@ -77,11 +77,16 @@ export function buildDiagnostics(
         }
     }
 
+    const diagnosticsByUri = new Map<vscode.Uri, vscode.Diagnostic[]>();
+    for (const group of grouped.values()) {
+        diagnosticsByUri.set(group.uri, group.entries);
+    }
+
     return { nextFiles, diagnosticsByUri };
 }
 
 export function appendDiagnostic(
-    target: Map<vscode.Uri, vscode.Diagnostic[]>,
+    target: Map<string, { uri: vscode.Uri; entries: vscode.Diagnostic[] }>,
     uri: vscode.Uri,
     range: vscode.Range,
     message: string,
@@ -92,11 +97,12 @@ export function appendDiagnostic(
     entry.source = DIAGNOSTIC_SOURCE;
     entry.code = code;
 
-    const list = target.get(uri);
-    if (list) {
-        list.push(entry);
+    const key = uri.toString();
+    const group = target.get(key);
+    if (group) {
+        group.entries.push(entry);
     } else {
-        target.set(uri, [entry]);
+        target.set(key, { uri, entries: [entry] });
     }
 }
 
@@ -179,20 +185,49 @@ export function buildDiagnosticCode(
     return finding.rule_id;
 }
 
-export function buildEvidenceRange(
+export async function buildEvidenceRange(
     item: ShexliEvidence,
     line: number,
-): vscode.Range {
+    uri: vscode.Uri,
+): Promise<vscode.Range> {
     const snippet = item.snippet ?? "";
+    const column = item.column ?? 0;
+
     if (!snippet) {
-        return new vscode.Range(line, 0, line, 1);
+        return new vscode.Range(line, column, line, column + 1);
     }
 
-    const trimmed = snippet.trimEnd();
-    const firstLine = trimmed.split("\n", 1)[0] ?? "";
+    // Heuristic: The snippet usually starts after indentation.
+    // To be precise, we try to find the snippet on the actual line in the file.
+    try {
+        const document = await vscode.workspace.openTextDocument(uri);
+        if (line < document.lineCount) {
+            const lineText = document.lineAt(line).text;
+            const trimmedSnippet = snippet.trim();
+            const startCol = lineText.indexOf(trimmedSnippet);
+            if (startCol !== -1) {
+                return new vscode.Range(
+                    line,
+                    startCol,
+                    line,
+                    startCol + trimmedSnippet.length,
+                );
+            }
+        }
+    } catch (err) {
+        // Fallback to basic indentation detection if file can't be read
+    }
+
+    const firstLine = snippet.split("\n", 1)[0] ?? "";
     const indentMatch = firstLine.match(/^\s*/);
-    const startCol = indentMatch ? indentMatch[0].length : 0;
-    const length = Math.max(1, firstLine.length - startCol);
+    const indentation = indentMatch ? indentMatch[0].length : 0;
+    
+    // The analyzer's 'snippet' typically includes the leading indentation of the line.
+    // We want the squiggly to start AFTER that indentation.
+    const startCol = column + indentation;
+    const trimmed = firstLine.trimEnd();
+    const length = Math.max(1, trimmed.length - indentation);
+    
     return new vscode.Range(line, startCol, line, startCol + length);
 }
 
